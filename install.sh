@@ -165,20 +165,20 @@ print_status "Basic SSH hardening..."
 # Backup original sshd_config
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
 
-print_warning "Root SSH login is still ENABLED!"
-print_warning "Create a non-root user and disable root login manually later:"
-print_warning "  1. Create user: adduser USERNAME"
-print_warning "  2. Add sudo: usermod -aG sudo USERNAME"
-print_warning "  3. Edit /etc/ssh/sshd_config: PermitRootLogin no"
-print_warning "  4. Restart SSH: systemctl restart sshd"
+#print_warning "Root SSH login is still ENABLED!"
+# print_warning "Create a non-root user and disable root login manually later:"
+# print_warning "  1. Create user: adduser USERNAME"
+# print_warning "  2. Add sudo: usermod -aG sudo USERNAME"
+# print_warning "  3. Edit /etc/ssh/sshd_config: PermitRootLogin no"
+# print_warning "  4. Restart SSH: systemctl restart sshd"
 
 # Apply basic SSH hardening
-# sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-# sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
-# sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # Restart SSH service
-# systemctl restart sshd
+systemctl restart sshd
 
 # print_warning "SSH hardening applied. Root login disabled."
 # print_warning "Make sure you have a non-root user with sudo access!"
@@ -199,7 +199,27 @@ apt-get install -y msmtp msmtp-mta
 read -p "Configure SMTP for email notifications? (y/n): " configure_smtp
 if [ "$configure_smtp" = "y" ]; then
     read -p "SMTP Host (e.g., smtp.gmail.com): " smtp_host
-    read -p "SMTP Port (e.g., 587): " smtp_port
+    
+    # Ask for TLS/SSL configuration FIRST
+    echo ""
+    echo "TLS Configuration:"
+    echo "1) STARTTLS (Port 587) - Standard für Gmail, etc."
+    echo "2) SSL/TLS (Port 465) - Für Ionos, Strato, etc."
+    read -p "Select TLS mode (1 or 2): " tls_mode
+    
+    if [ "$tls_mode" = "2" ]; then
+        tls_on="on"
+        tls_starttls="off"
+        default_port="465"
+    else
+        tls_on="on"
+        tls_starttls="on"
+        default_port="587"
+    fi
+    
+    read -p "SMTP Port (default: ${default_port}, press Enter to use default): " smtp_port
+    smtp_port=${smtp_port:-$default_port}
+    
     read -p "SMTP User/Email: " smtp_user
     read -s -p "SMTP Password: " smtp_pass
     echo ""
@@ -211,7 +231,8 @@ if [ "$configure_smtp" = "y" ]; then
 # Default settings
 defaults
 auth           on
-tls            on
+tls            ${tls_on}
+tls_starttls   ${tls_starttls}
 tls_trust_file /etc/ssl/certs/ca-certificates.crt
 logfile        /var/log/msmtp.log
 
@@ -227,9 +248,10 @@ EOF
     # Set proper permissions
     chmod 600 /etc/msmtprc
     
-    # Create log file
+    # Create log file with proper permissions
     touch /var/log/msmtp.log
-    chmod 666 /var/log/msmtp.log
+    chown root:msmtp /var/log/msmtp.log 2>/dev/null || chown root:root /var/log/msmtp.log
+    chmod 660 /var/log/msmtp.log
     
     # Configure unattended-upgrades to send email
     sed -i "s|//Unattended-Upgrade::Mail \"\";|Unattended-Upgrade::Mail \"${notify_email}\";|" /etc/apt/apt.conf.d/50unattended-upgrades
