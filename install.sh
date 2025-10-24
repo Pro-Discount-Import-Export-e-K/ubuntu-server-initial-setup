@@ -148,7 +148,7 @@ maxretry = 5
 enabled = true
 port = 22
 logpath = %(sshd_log)s
-backend = %(sshd_backend)s
+backend = systemd
 EOF
 
 # Enable and start fail2ban
@@ -170,7 +170,7 @@ cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
 # print_warning "  1. Create user: adduser USERNAME"
 # print_warning "  2. Add sudo: usermod -aG sudo USERNAME"
 # print_warning "  3. Edit /etc/ssh/sshd_config: PermitRootLogin no"
-# print_warning "  4. Restart SSH: systemctl restart sshd"
+# print_warning "  4. Restart SSH: systemctl restart ssh"
 
 # Apply basic SSH hardening
 sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -178,7 +178,7 @@ sed -i 's/PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
 sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
 # Restart SSH service
-systemctl restart sshd
+systemctl restart ssh
 
 # print_warning "SSH hardening applied. Root login disabled."
 # print_warning "Make sure you have a non-root user with sudo access!"
