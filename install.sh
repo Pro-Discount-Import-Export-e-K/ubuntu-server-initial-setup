@@ -190,13 +190,62 @@ print_status "Setting timezone to Europe/Berlin..."
 timedatectl set-timezone Europe/Berlin
 
 ###############################################################################
-# 8. Configure Automatic Security Updates Email Notifications (Optional)
+# 8. Configure SMTP for Email Notifications (Optional)
 ###############################################################################
-print_status "Installing mailutils for update notifications..."
-apt-get install -y mailutils
+print_status "Installing msmtp for SMTP email notifications..."
+apt-get install -y msmtp msmtp-mta
 
-# Configure unattended-upgrades to send email (requires mail configuration)
-sed -i 's|//Unattended-Upgrade::Mail "";|Unattended-Upgrade::Mail "root";|' /etc/apt/apt.conf.d/50unattended-upgrades
+# Prompt for SMTP configuration
+read -p "Configure SMTP for email notifications? (y/n): " configure_smtp
+if [ "$configure_smtp" = "y" ]; then
+    read -p "SMTP Host (e.g., smtp.gmail.com): " smtp_host
+    read -p "SMTP Port (e.g., 587): " smtp_port
+    read -p "SMTP User/Email: " smtp_user
+    read -s -p "SMTP Password: " smtp_pass
+    echo ""
+    read -p "From Email Address: " from_email
+    read -p "Notification Email Address: " notify_email
+    
+    # Create msmtp configuration
+    cat > /etc/msmtprc << EOF
+# Default settings
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+# SMTP Account
+account        default
+host           ${smtp_host}
+port           ${smtp_port}
+from           ${from_email}
+user           ${smtp_user}
+password       ${smtp_pass}
+EOF
+
+    # Set proper permissions
+    chmod 600 /etc/msmtprc
+    
+    # Create log file
+    touch /var/log/msmtp.log
+    chmod 666 /var/log/msmtp.log
+    
+    # Configure unattended-upgrades to send email
+    sed -i "s|//Unattended-Upgrade::Mail \"\";|Unattended-Upgrade::Mail \"${notify_email}\";|" /etc/apt/apt.conf.d/50unattended-upgrades
+    sed -i 's|//Unattended-Upgrade::MailReport "on-change";|Unattended-Upgrade::MailReport "on-change";|' /etc/apt/apt.conf.d/50unattended-upgrades
+    
+    print_status "SMTP configured successfully"
+    
+    # Test email
+    read -p "Send test email? (y/n): " send_test
+    if [ "$send_test" = "y" ]; then
+        echo "This is a test email from $(hostname)" | msmtp ${notify_email}
+        print_status "Test email sent to ${notify_email}"
+    fi
+else
+    print_warning "SMTP configuration skipped. Email notifications disabled."
+fi
 
 ###############################################################################
 # 9. Clean Up
